@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoRaFBSNet — Interactive Block Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background:#f4f6fa; color:#1a2332; }
+  header { background:#12263f; color:#fff; padding:16px 28px; }
+  header h1 { font-size:20px; font-weight:800; }
+  header p { font-size:13px; opacity:.75; margin-top:4px; }
+  main { display:flex; gap:18px; padding:18px; align-items:flex-start; flex-wrap:wrap; }
+
+  /* ---- Controls panel ---- */
+  #controls { background:#fff; border-radius:14px; padding:18px; width:300px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  #controls h2 { font-size:15px; margin-bottom:12px; color:#12263f; border-bottom:2px solid #e6ebf3; padding-bottom:8px;}
+  .field { margin-bottom:11px; }
+  .field label { display:block; font-size:12px; font-weight:600; color:#445; margin-bottom:4px; }
+  .field input, .field select { width:100%; padding:6px 8px; border:1px solid #ccd4e0; border-radius:8px; font-family:inherit; font-size:13px; background:#fafbfe;}
+  .row { display:flex; gap:8px; }
+  .row .field { flex:1; }
+  .chk { display:flex; align-items:center; gap:8px; font-size:13px; }
+  button { width:100%; margin-top:8px; padding:10px; border:none; border-radius:10px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer; }
+  #btnRender { background:#12263f; color:#fff; }
+  #btnPlay  { background:#e8542f; color:#fff; }
+  button:hover { filter:brightness(1.15); }
+
+  /* ---- Diagrams ---- */
+  .panel { background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.06); padding:14px; overflow:auto; margin-bottom:18px; }
+  .panel h3 { font-size:15px; color:#12263f; margin-bottom:6px; font-weight:800; }
+  .panel .hint { font-size:12px; color:#68738a; margin-bottom:8px; }
+  #diagramWrap { flex:1; min-width:760px; }
+  svg text { font-family:'Inter', sans-serif; }
+  .pulse { stroke:#e8542f !important; stroke-width:3.5 !important; filter:drop-shadow(0 0 5px #ffb59d); }
+  .dim  { opacity:.25; }
+  #badge { position:sticky; top:8px; float:left; background:#12263f; color:#fff; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; display:none; }
+
+  /* ---- Simulated console ---- */
+  #consoleWrap { margin:0 18px 18px; background:#0d1522; color:#9fe8a8; border-radius:14px; padding:16px; font-family:Consolas, monospace; font-size:12.5px; white-space:pre; overflow:auto; max-height:300px; box-shadow:0 2px 10px rgba(0,0,0,.15);}
+  #consoleWrap h3 { font-family:'Inter'; color:#fff; font-size:14px; margin-bottom:10px;}
+
+  /* ---- Explanations ---- */
+  #explain { max-width:1150px; margin:0 auto 40px; padding:0 18px; }
+  details { background:#fff; border-radius:12px; margin-bottom:10px; box-shadow:0 1px 6px rgba(0,0,0,.05); overflow:hidden;}
+  summary { cursor:pointer; padding:14px 18px; font-weight:800; font-size:15px; color:#12263f; background:#eef2f9; }
+  .body { padding:16px 20px; font-size:14px; line-height:1.9; color:#33415c; }
+  .body code, .body b.code { background:#eef2f9; padding:1px 6px; border-radius:5px; font-family:Consolas, monospace; font-size:13px; color:#c7391b;}
+  .body pre { background:#0d1522; color:#cde3ff; padding:14px; border-radius:10px; font-size:12.5px; overflow:auto; line-height:1.7; margin:10px 0;}
+  .warn { background:#fff4e5; border-left:4px solid #e8960f; padding:10px 14px; border-radius:8px; margin:10px 0; }
+  .tip  { background:#e8f5e9; border-left:4px solid #2e7d32; padding:10px 14px; border-radius:8px; margin:10px 0; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:6px; }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .sw { width:14px; height:14px; border-radius:4px; border:1px solid #5a6b85; display:inline-block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧠 LoRaFBSNet — Interactive Block Diagram (Spiking ResNet with Local Recurrence &amp; Top-Down Feedback)</h1>
+  <p>Change parameters → "Re-render" → diagram, tensor shapes, and simulated print output all update. Press "Step-through simulation" to animate the time loop (t = 0 … T−1).</p>
+</header>
+
+<main>
+  <div id="controls">
+    <h2>⚙️ Model &amp; Input Parameters</h2>
+    <div class="field"><label>Block type</label>
+      <select id="block"><option value="basic">BasicBlock (expansion=1)</option><option value="bottleneck">Bottleneck (expansion=4)</option></select>
+    </div>
+    <div class="field"><label>layers = [l1, l2, l3, l4] (blocks per stage)</label>
+      <div class="row">
+        <input id="l0" type="number" value="2" min="1"><input id="l1" type="number" value="2" min="1">
+        <input id="l2" type="number" value="2" min="1"><input id="l3" type="number" value="2" min="1">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>num_classes</label><input id="numClasses" type="number" value="3" min="1"></div>
+      <div class="field"><label>cnf (SEW merge)</label>
+        <select id="cnf"><option>ADD</option><option>AND</option><option>OR</option></select>
+      </div>
+    </div>
+    <div class="field"><label>feedback_range (0–3): <span id="frVal">1</span></label>
+      <input id="feedbackRange" type="range" min="0" max="3" value="1" style="width:100%">
+    </div>
+    <div class="field chk"><label><input id="localRec" type="checkbox" checked> local_recurrence enabled</label></div>
+    <div class="field"><label>recurrent_scale</label><input id="recScale" type="number" value="1" step="0.1"></div>
+    <div class="row">
+      <div class="field"><label>T (time steps)</label><input id="T" type="number" value="4" min="1"></div>
+      <div class="field"><label>B (batch)</label><input id="B" type="number" value="2" min="1"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>H</label><input id="H" type="number" value="64" min="32"></div>
+      <div class="field"><label>W</label><input id="W" type="number" value="64" min="32"></div>
+    </div>
+    <button id="btnRender">🔄 Re-render diagram</button>
+    <button id="btnPlay">▶️ Step-through simulation (time loop)</button>
+  </div>
+
+  <div id="diagramWrap" class="panel">
+    <span id="badge"></span>
+    <h3>Overview: forward flow</h3>
+    <div class="hint">Purple = local recurrence path (y(t−1) back into the same stage) &nbsp;•&nbsp; Green = top-down feedback between stages (delayed by one time step) &nbsp;•&nbsp; Orange pulse = animated during simulation</div>
+    <svg id="svg" width="1050"></svg>
+  </div>
+</main>
+
+<div class="panel" style="margin:0 18px 18px;">
+  <h3>🔍 Detail A — <span id="detBlockName">BasicBlock</span> internals (what runs inside each stage's <code>sub_module</code>)</h3>
+  <div class="hint">Residual block with LIF neurons after every BatchNorm. The identity branch is merged with the conv branch via <code>sew_function</code> at the end.</div>
+  <svg id="svgBlock" width="1050"></svg>
+</div>
+
+<div class="panel" style="margin:0 18px 18px;">
+  <h3>🔍 Detail B — <code>FeedbackConnection</code> internals (one diagram per feedback edge)</h3>
+  <div class="hint">Each edge upsamples the deep source output back to the shallow target's resolution: repeated Depthwise-ConvTranspose 3×3 (s2) → BN → LIF, then a 1×1 conv + LIF if channels differ.</div>
+  <div id="fbDetails"></div>
+</div>
+
+<div class="panel" style="margin:0 18px 18px;">
+  <h3>🔍 Detail C — <code>ConvRecurrentContainer</code> internals (zoom of one stage)</h3>
+  <div class="hint">How x(t), the scaled recurrent state y(t−1), and external feedback are fused, then pushed through the stage.</div>
+  <svg id="svgRec" width="1050"></svg>
+</div>
+
+<div id="consoleWrap"><h3>🖥️ Simulated print output of the code (for current input)</h3><div id="console"></div></div>
+
+<div id="explain">
+  <details open><summary>1) Overview: what is LoRaFBSNet?</summary><div class="body">
+    This is a <b>Spiking Neural Network (SNN)</b> in the ResNet family (similar to SEW-ResNet from SpikingJelly) with two extra mechanisms:
+    <br>1. <b>Local recurrence:</b> each stage's own output from the previous time step (<code>y</code>) is re-injected into the same stage (short-term memory).
+    <br>2. <b>Top-down feedback:</b> outputs of <b>deeper</b> stages are routed back to <b>shallower</b> stages (like top-down pathways in recurrent vision models).
+    <br><br>Overall flow: <code>Input [T,B,3,H,W]</code> → Stem → 4 recurrent stages → AvgPool → Linear → <code>[T,B,num_classes]</code>
+    <div class="tip">Key point: the input is a <b>time sequence</b>. The Stem runs on all T frames first, then the <code>for t in range(T)</code> loop runs all 4 stages once per time step.</div>
+  </div></details>
+
+  <details><summary>2) <code>sew_function</code> — merging the main path and the shortcut</summary><div class="body">
+    At the end of every residual block, the conv output is merged with the identity:
+    <pre>ADD → x + y            (plain sum, like ResNet)
+AND → x * y            (multiplicative / AND)
+OR  → x + y - x * y    (fuzzy / probabilistic OR)</pre>
+    <div class="warn">Any other cnf string raises <code>NotImplementedError</code>.</div>
+  </div></details>
+
+  <details><summary>3) BasicBlock &amp; Bottleneck — spiking residual blocks</summary><div class="body">
+    Exactly like classic ResNet, but every BatchNorm is followed by a <b>LIF neuron</b> (Leaky Integrate &amp; Fire) with <code>ATan</code> surrogate gradient and <code>detach_reset=True</code>:
+    <br>• <b>BasicBlock:</b> two 3×3 convolutions. Output channels = <code>planes</code> (expansion=1).
+    <br>• <b>Bottleneck:</b> three convolutions (1×1 reduce → 3×3 → 1×1 expand). Output channels = <code>planes × 4</code> (expansion=4).
+    <br>• If stride changes or channel counts differ, a <b>downsample</b> branch (Conv 1×1 + BN) followed by <code>downsample_sn</code> (a LIF) aligns the identity path.
+    <br>• Convolutions come from <code>spikingjelly.clock_driven.layer</code> (SNN-compatible versions).
+    <div class="warn"><b>Subtle point:</b> in <code>_make_layer</code>, the <code>downsample</code> Sequential only contains Conv+BN — the LIF (<code>downsample_sn</code>) is applied manually in the block's <code>forward</code>. The blocks after the first one are created <b>without</b> a downsample argument (stride=1 assumed), matching standard ResNet construction.</div>
+  </div></details>
+
+  <details><summary>4) FeedbackConnection — the feedback path (deep → shallow)</summary><div class="body">
+    Job: take a deep stage's output (small spatial size) and transform it into the shallow stage's size and channel count:
+    <br>1. Checks <code>source_stride % target_stride == 0</code>.
+    <br>2. <code>scale_factor = source_stride // target_stride</code> must be a <b>power of 2</b>.
+    <br>3. Repeats this chain <code>log2(scale_factor)</code> times:
+    <pre>ConvTranspose2d(3×3, stride=2, groups=C) → BatchNorm → LIF</pre>
+    (Depthwise upsample — channel count stays constant during upsampling.)
+    <br>4. If source channels ≠ target channels, adds <code>Conv2d(1×1)</code> + LIF to match.
+    <div class="warn"><b>Hidden bug:</b> if <code>scale_factor == 1</code> (equal strides), no module is built at all, but <code>forward</code> still uses <code>self.feedback</code> → <code>AttributeError</code>! In this architecture it never happens (target stride is always smaller), but it would break if you added a same-resolution feedback edge.</div>
+  </div></details>
+
+  <details><summary>5) ConvRecurrentContainer — the heart of the model</summary><div class="body">
+    Each stage is a recurrent container wrapping the ResNet blocks (<code>sub_module</code>). Inputs are <b>concatenated</b>:
+    <pre>C_total = in_channels + out_channels + total_external_feedback_channels</pre>
+    Internal flow at each time step t:
+    <pre>x(t) ──────┐
+y(t−1)─────┤→ [×recurrent_scale] → Concat → PWConv 1×1 (C_total→C_in) → BN → LIF → sub_module → y(t)
+FB(t−1)────┘</pre>
+    • <b>Recurrent state prep</b> (<code>_prepare_recurrent_state</code>): if <code>y</code> is None (first step) → zero tensor. Otherwise: <code>ConvTranspose2d(depthwise, stride=stride)</code> → BN → LIF → (if needed) <code>interpolate nearest</code> to match current H×W.
+    <br>• <b>External feedback:</b> spatial mismatch → interpolate nearest; channel mismatch → <code>RuntimeError</code>; no feedback → zeros.
+    <br>• <code>self.y</code> is registered via <code>register_memory</code> so <code>functional.reset_net</code> can clear it.
+    <div class="tip"><b>Why does the PWConv map back to C_in?</b> Because the <code>sub_module</code> (the ResNet stage) expects exactly <code>in_channels</code> input channels. Recurrent + feedback information is "compressed" before entering the residual blocks.</div>
+  </div></details>
+
+  <details><summary>6) Feedback graph (<code>_build_feedback_graph</code>)</summary><div class="body">
+    For every source stage and every distance <code>d = 1..feedback_range</code>: edge <code>(source, source−d)</code> is created (if target ≥ 0).
+    <br>E.g. <code>feedback_range=2</code>: edges (2→1),(3→2),(3→1),(2→0),(3→0)… i.e. deep information flows back to shallow stages.
+    <div class="warn"><b>Subtle point:</b> when building <code>incoming_feedback_channels</code>, the code appends <code>stage_channels[target]</code> (not source). Since the FeedbackConnection ends with a 1×1 conv mapping to the target's channels, each incoming feedback edge contributes exactly <code>stage_channels[target]</code> channels — so a stage's external feedback width = <b>number of incoming edges × its own channel count</b>.</div>
+  </div></details>
+
+  <details><summary>7) Time loop in <code>forward</code> — feedback is delayed by one step</summary><div class="body">
+    <pre>for t in range(T):
+    previous_outputs = [y1, y2, y3, y4]   # the y's from step t−1 !
+    feedback_l1 = _compute_feedback(target=0, previous_outputs)
+    x1 = recurrent_layer1.single_step_forward(xt, feedback_l1)
+    ... (same for layers 2..4)
+    logits = fc(flatten(avgpool(x4)))</pre>
+    <div class="tip"><b>Feedback has a one-step delay:</b> because <code>previous_outputs</code> is read before running the stages, the feedback layer 1 receives at step t is based on other stages' outputs from step <b>t−1</b>. At t=0 all feedbacks are <code>None</code> (since <code>reset_state</code> is called at the start of <code>forward</code>).
+    <br><b>Note:</b> because <code>reset_state</code> runs at the start of every <code>forward</code>, neuron states persist across time steps <i>within</i> one call but are cleared between calls.</div>
+    <div class="warn">The <code>print</code> statements (fusion_inputs and feedbacks) are debug-only and should be removed for real training — they severely slow things down.</div>
+  </div></details>
+</div>
+
+<script>
+/* ================= Model state (mirrors the Python code) ================= */
+const S = { block:'basic', layers:[2,2,2,2], numClasses:3, cnf:'ADD',
+            feedbackRange:1, localRec:true, recScale:1, T:4, B:2, H:64, W:64 };
+
+function readControls(){
+  S.block = document.getElementById('block').value;
+  S.layers = [0,1,2,3].map(i=>+document.getElementById('l'+i).value||1);
+  S.numClasses = +document.getElementById('numClasses').value||3;
+  S.cnf = document.getElementById('cnf').value;
+  S.feedbackRange = +document.getElementById('feedbackRange').value;
+  document.getElementById('frVal').textContent = S.feedbackRange;
+  S.localRec = document.getElementById('localRec').checked;
+  S.recScale = +document.getElementById('recScale').value||1;
+  S.T = +document.getElementById('T').value||1;
+  S.B = +document.getElementById('B').value||1;
+  S.H = +document.getElementById('H').value||64;
+  S.W = +document.getElementById('W').value||64;
+}
+
+function computeModel(){
+  const exp = S.block==='bottleneck' ? 4 : 1;
+  const BlockName = S.block==='bottleneck' ? 'Bottleneck' : 'BasicBlock';
+  const sc = [64*exp, 128*exp, 256*exp, 512*exp];   // stage_channels
+  const strides = [1,2,4,8];                        // stage_strides
+  const inCh = [64, sc[0], sc[1], sc[2]];           // in_channels per container
+  const graph = [];                                  // _build_feedback_graph
+  for(let s=0;s<4;s++) for(let d=1; d<=S.feedbackRange; d++){
+    const t = s-d; if(t>=0) graph.push([s,t]);
+  }
+  const ext = [[],[],[],[]];
+  graph.forEach(([s,t])=> ext[t].push(sc[t]));
+  const extTotal = ext.map(a=>a.reduce((x,y)=>x+y,0));
+  const spat  = [ S.H/4, S.H/8, S.H/16, S.H/32 ];
+  const spatW = [ S.W/4, S.W/8, S.W/16, S.W/32 ];
+  const totCh = inCh.map((c,i)=> c + sc[i] + extTotal[i]);
+  return {exp, BlockName, sc, strides, inCh, graph, ext, extTotal, spat, spatW, totCh};
+}
+
+/* ================= SVG helpers ================= */
+const NS='http://www.w3.org/2000/svg';
+const COLORS={ stem:'#dcecfc', conv:'#cfe3f7', bn:'#ffe6bf', lif:'#fcd5d0',
+               sub:'#cdeccc', rec:'#eadcf5', cat:'#fff2a8', head:'#d7f0ee', out:'#12263f', ds:'#d8e8d0' };
+function mkSVG(id){
+  const s=document.getElementById(id);
+  s._el=function(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||s).appendChild(e);return e;};
+  return s;
+}
+function addDefs(svg){
+  const defs = svg._el('defs',{});
+  [['arr','#37474f'],['arrg','#2e7d32'],['arrp','#7b3fa0']].forEach(([id,c])=>{
+    const m=svg._el('marker',{id,markerWidth:9,markerHeight:9,refX:7,refY:4.5,orient:'auto'},defs);
+    svg._el('path',{d:'M0,0 L9,4.5 L0,9 Z',fill:c},m);
+  });
+}
+function txt(svg,x,y,str,o={}){
+  const {size=12,fill='#1a2332',weight=600,anchor='middle'}=o;
+  const t=svg._el('text',{x,y,'font-size':size,fill,'font-weight':weight,'text-anchor':anchor});
+  t.textContent=str; return t;
+}
+function chip(svg,x,y,w,h,title,sub,color,id){
+  const g=svg._el('g',id?{id}:{});
+  svg._el('rect',{x,y,width:w,height:h,rx:8,fill:color||'#e8eef7',stroke:'#5a6b85','stroke-width':1.3},g);
+  txt(svg,x+w/2, y+(sub?h/2-2:h/2+4), title,{size:11.5,weight:700});
+  if(sub) txt(svg,x+w/2, y+h/2+13, sub,{size:9.5,fill:'#5a6b85',weight:500});
+  return g;
+}
+function arrow(svg,pts,o={}){
+  const {color='#37474f', w=2, dash=null, id=null, marker='arr'}=o;
+  const d='M'+pts.map(p=>p.join(',')).join(' L ');
+  const a={d,fill:'none',stroke:color,'stroke-width':w,'marker-end':`url(#${marker})`};
+  if(dash)a['stroke-dasharray']=dash;
+  if(id)a.id=id;
+  return svg._el('path',a);
+}
+function label(svg,x,y,str,color='#37474f',size=10){
+  return txt(svg,x,y,str,{size,fill:color,weight:600});
+}
+
+/* ================= Main diagram ================= */
+let fbArrowIds=[], fbArrowActive=[];
+const svg=mkSVG('svg');
+
+function renderMain(M){
+  svg.innerHTML=''; addDefs(svg);
+  fbArrowIds=[]; fbArrowActive=[];
+  const stemY=42, stemH=62, gap=26, stageH=176;
+  const stageY=i=>stemY+stemH+gap+i*(stageH+gap);
+  const sh=M.spat, sw=M.spatW;
+
+  /* ---- Stem ---- */
+  svg._el('rect',{x:290,y:stemY,width:414,height:stemH,rx:10,fill:'#eef5ff',stroke:'#2c5f9e','stroke-width':1.6});
+  txt(svg,497,stemY+18,'Stem  (runs on all T frames)',{size:12,weight:800,fill:'#12263f'});
+  chip(svg,300,stemY+28,110,28,'Conv 7×7 s2','3 → 64',COLORS.conv,'st-c');
+  chip(svg,418,stemY+28,44,28,'BN',null,COLORS.bn,'st-b');
+  chip(svg,470,stemY+28,44,28,'LIF',null,COLORS.lif,'st-l');
+  chip(svg,522,stemY+28,120,28,'MaxPool 3×3 s2',null,COLORS.conv,'st-m');
+  label(svg,497, stemY+stemH+14, `[B, 64, ${sh[0]}, ${sw[0]}]`);
+
+  /* ---- Stages ---- */
+  for(let i=0;i<4;i++){
+    const yi=stageY(i), cy=yi+66;
+    svg._el('rect',{x:290,y:yi,width:414,height:stageH,rx:12,fill:'#fbfcff',stroke:'#12263f','stroke-width':1.8});
+    txt(svg,302,yi+20,`L${i+1} : ConvRecurrentContainer`,{size:13,weight:800,anchor:'start',fill:'#12263f'});
+    txt(svg,694,yi+20,`stride=${M.strides[i]}   •   ${sh[i]}×${sw[i]}   •   layers=${S.layers[i]}`,{size:10.5,fill:'#5a6b85',anchor:'end'});
+
+    chip(svg,300,yi+42,44,44,'Cat','concat',COLORS.cat,`cat-${i}`);
+    chip(svg,352,yi+42,118,44,'PWConv 1×1',`${M.totCh[i]} → ${M.inCh[i]}`,COLORS.conv,`pw-${i}`);
+    chip(svg,478,yi+42,44,44,'BN',null,COLORS.bn,`bn-${i}`);
+    chip(svg,530,yi+42,44,44,'LIF',null,COLORS.lif,`lif-${i}`);
+    chip(svg,582,yi+42,110,44,`${S.layers[i]}×${M.BlockName}`,`${M.inCh[i]}→${M.sc[i]} • ${S.cnf}`,COLORS.sub,`sub-${i}`);
+    [[344,352],[470,478],[522,530],[574,582]].forEach(([a,b])=>arrow(svg,[[a,cy],[b,cy]],{}));
+
+    // output y going down
+    const yEnd = i<3 ? stageY(i+1) : stageY(3)+stageH+20;
+    arrow(svg,[[637,yi+86],[637,yEnd]],{id:`out-${i}`});
+    label(svg,646, yi+110, `y(t)  [B,${M.sc[i]},${sh[i]},${sw[i]}]`, '#2e7d32');
+
+    // recurrence path (left side)
+    const recX=104, recY=yi+38, recW=178, recH=62;
+    chip(svg,recX,recY,recW,recH,'Recurrent: y(t−1) × '+S.recScale,
+         M.strides[i]>1 ? 'DWConvT s2 → BN → LIF → Interp' : 'Interp(nearest) → ×scale',
+         S.localRec?COLORS.rec:'#eceff4',`rec-${i}`);
+    arrow(svg,[[637,yi+104],[193,yi+104],[193,recY+recH+3]],{color:'#7b3fa0',marker:'arrp',id:`recA-${i}`,dash:'5,4'});
+    arrow(svg,[[193,recY-2],[193,cy],[296,cy]],{color:'#7b3fa0',marker:'arrp',dash:'5,4'});
+    label(svg,104, yi+118, S.localRec? 'local recurrence':'recurrence disabled','#7b3fa0',9.5);
+  }
+
+  /* ---- Feedback edges (right side) ---- */
+  M.graph.forEach(([s,t],idx)=>{
+    const lane = 740 + idx*30;
+    const sy = stageY(s)+66, ty = stageY(t)+66;
+    const entryY = ty + 46;
+    const d = M.strides[s]/M.strides[t];
+    const nUp = Math.log2(d);
+    const id=`fb-${idx}`;
+    arrow(svg,[[694,sy],[lane,sy],[lane,entryY],[708,entryY]],{color:'#2e7d32',w:2.2,marker:'arrg',id});
+    label(svg,lane+4,(sy+entryY)/2+3,`FB L${s+1}→L${t+1}`,'#2e7d32',10.5);
+    label(svg,lane+4,(sy+entryY)/2+17,`↑×${d} (${nUp}× DWConvT) → 1×1 → ${M.sc[t]}ch`,'#2e7d32',9);
+    fbArrowIds.push(id);
+    fbArrowActive.push(M.extTotal[t]>0);
+  });
+  if(M.graph.length===0){
+    label(svg,742, stageY(1)+50,'feedback_range = 0 → no feedback edges','#b04a3a',12);
+  }
+
+  /* ---- Head ---- */
+  const hy=stageY(3)+stageH+24;
+  arrow(svg,[[637,stageY(3)+86],[637,hy]],{});
+  svg._el('rect',{x:290,y:hy,width:414,height:74,rx:10,fill:'#eefaf8',stroke:'#1e7a6f','stroke-width':1.6});
+  chip(svg,300,hy+16,120,42,'AdaptiveAvgPool','(1,1)',COLORS.head,'h-avg');
+  chip(svg,428,hy+16,80,42,'Flatten',null,COLORS.head,'h-flat');
+  chip(svg,516,hy+16,110,42,'Linear (fc)',`${M.sc[3]} → ${S.numClasses}`,COLORS.head,'h-fc');
+  arrow(svg,[[420,hy+37],[426,hy+37]],{}); arrow(svg,[[508,hy+37],[514,hy+37]],{});
+  const oy=hy+74+36;
+  arrow(svg,[[637,hy+74],[637,oy-6]],{id:'h-out'});
+  svg._el('rect',{x:510,y:oy,width:226,height:34,rx:17,fill:COLORS.out});
+  txt(svg,623,oy+22,`Output  [${S.T}, ${S.B}, ${S.numClasses}]`,{size:12.5,fill:'#fff',weight:700});
+
+  svg.setAttribute('height', oy+52);
+
+  if(S.H%32!==0 || S.W%32!==0){
+    svg._el('rect',{x:290,y:stemY-28,width:414,height:20,rx:5,fill:'#fff4e5',stroke:'#e8960f'});
+    txt(svg,497,stemY-14,'⚠ H and W should be divisible by 32 for exact sizes',{size:10,fill:'#a3690a',weight:700});
+  }
+}
+
+/* ================= Detail A: BasicBlock / Bottleneck ================= */
+const svgBlock=mkSVG('svgBlock');
+function renderBlockDetail(M){
+  svgBlock.innerHTML=''; addDefs(svgBlock);
+  document.getElementById('detBlockName').textContent=M.BlockName;
+  const isB = M.BlockName==='Bottleneck';
+  const exp = M.exp;
+  const bY=20;
+  // Use stage 2 as example: in=64*exp, planes=128, stride=2
+  const inC = M.inCh[1], planes=128, s=2, width=isB?planes:planes;
+  const outC = planes*exp;
+
+  svgBlock._el('rect',{x:40,y:bY,width:970,height:isB?200:170,rx:12,fill:'#fbfcff',stroke:'#12263f','stroke-width':1.6});
+  txt(svgBlock,525,bY+20,`${M.BlockName}  (example: stage L2, stride=2, planes=128)` ,{size:13,weight:800,fill:'#12263f'});
+  const rowY=bY+42, cy=rowY+22;
+
+  let x=60;
+  const chips=[];
+  function addC(w,title,sub,color,id){ chip(svgBlock,x,rowY,w,44,title,sub,color,id); chips.push({x1:x, x2:x+w, id}); x+=w+6; }
+
+  addC(70,'Input','['+inC+'ch]',COLORS.stem,'b-in');
+  if(isB){
+    addC(96,'Conv 1×1',inC+'→'+width,COLORS.conv,'b-c1');
+    addC(40,'BN',null,COLORS.bn,'b-n1'); addC(44,'LIF',null,COLORS.lif,'b-s1');
+    addC(96,'Conv 3×3 s'+s,width+'→'+width,COLORS.conv,'b-c2');
+    addC(40,'BN',null,COLORS.bn,'b-n2'); addC(44,'LIF',null,COLORS.lif,'b-s2');
+    addC(96,'Conv 1×1',width+'→'+outC,COLORS.conv,'b-c3');
+    addC(40,'BN',null,COLORS.bn,'b-n3'); addC(44,'LIF',null,COLORS.lif,'b-s3');
+  } else {
+    addC(100,'Conv 3×3 s'+s,inC+'→'+planes,COLORS.conv,'b-c1');
+    addC(40,'BN',null,COLORS.bn,'b-n1'); addC(44,'LIF',null,COLORS.lif,'b-s1');
+    addC(100,'Conv 3×3',planes+'→'+planes,COLORS.conv,'b-c2');
+    addC(40,'BN',null,COLORS.bn,'b-n2'); addC(44,'LIF',null,COLORS.lif,'b-s2');
+  }
+  addC(78,'SEW ('+S.cnf+')','⊕ merge',COLORS.cat,'b-sew');
+  addC(74,'Output','['+outC+'ch]',COLORS.stem,'b-out');
+
+  for(let k=0;k<chips.length-1;k++)
+    arrow(svgBlock,[[chips[k].x2,cy],[chips[k+1].x1,cy]],{});
+
+  // shapes annotation row
+  let shapes = isB
+    ? `[B,${inC},32,32] → [B,${width},16,16] → [B,${width},16,16] → [B,${outC},16,16]`
+    : `[B,${inC},32,32] → [B,${planes},16,16] → [B,${planes},16,16]`;
+  txt(svgBlock,525,bY+118,'Shapes: '+shapes,{size:10.5,fill:'#5a6b85',weight:600});
+
+  // downsample branch
+  if(s!==1 || true){
+    const dY=bY+(isB?150:124);
+    txt(svgBlock,60,dY-4,'downsample branch (identity path, only when stride≠1 or channels change):',{size:10.5,weight:700,anchor:'start',fill:'#2e5d2e'});
+    chip(svgBlock,470,dY,110,32,'Conv 1×1 s'+s,inC+'→'+outC,COLORS.ds,'b-ds');
+    chip(svgBlock,586,dY,40,32,'BN',null,COLORS.ds,'b-dsb');
+    chip(svgBlock,632,dY,40,32,'LIF','downsample_sn',COLORS.lif,'b-dss');
+    arrow(svgBlock,[[678,dY+16],[718,dY+16]],{color:'#2e5d2e'});
+    label(svgBlock,724,dY+20,'→ merges into SEW','#2e5d2e',10);
+    // dashed line from input down and to downsample
+    arrow(svgBlock,[[95,cy],[95,dY+16],[466,dY+16]],{color:'#2e5d2e',dash:'4,4',marker:'arrg'});
+  }
+  svgBlock.setAttribute('height', bY+(isB?210:180));
+
+  // SEW explanation
+  txt(svgBlock,525, bY+(isB?228:196),
+      `sew_function:  ADD → x+y    AND → x*y    OR  → x+y−x*y     (current: ${S.cnf})`,
+      {size:11,fill:'#8a5a00',weight:700});
+}
+
+/* ================= Detail B: FeedbackConnection per edge ================= */
+function renderFeedbackDetails(M){
+  const wrap=document.getElementById('fbDetails');
+  wrap.innerHTML='';
+  if(M.graph.length===0){
+    wrap.innerHTML='<div class="hint" style="color:#b04a3a;font-weight:700">feedback_range = 0 → no FeedbackConnection modules exist.</div>';
+    return;
+  }
+  M.graph.forEach(([s,t],idx)=>{
+    const div=document.createElement('div');
+    div.style.marginBottom='12px';
+    const sv=document.createElementNS(NS,'svg');
+    sv.setAttribute('width','1050');
+    sv._el=function(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||sv).appendChild(e);return e;};
+    div.appendChild(sv);
+    addDefs(sv);
+    const src=M.sc[s], tgt=M.sc[t], d=M.strides[s]/M.strides[t];
+    const nUp=Math.log2(d);
+    const h=110, y=14;
+    sv._el('rect',{x:40,y,width:970,height:h,rx:10,fill:'#f4fbf5',stroke:'#2e7d32','stroke-width':1.5});
+    txt(sv,525,y+20,`Edge "${s+1}_to_${t+1}"  →  source L${s+1} (${src}ch, s=${M.strides[s]})  →  target L${t+1} (${tgt}ch, s=${M.strides[t]})  •  scale ×${d} → ${nUp} upsample step(s)`,{size:12.5,weight:800,fill:'#1b4d1b'});
+
+    let x=64, cy=y+62;
+    chip(sv,x,y+40,72,44,'Input','y_'+(s+1)+'(t−1)',COLORS.stem,'fd-in-'+idx); x+=84;
+    for(let u=0;u<nUp;u++){
+      chip(sv,x,y+40,120,44,'DWConvT 3×3 s2','groups='+src+' (ch stays)',COLORS.conv,'fd-u'+u+'-'+idx); x+=128;
+      chip(sv,x,y+40,36,44,'BN',null,COLORS.bn,'fd-bn'+u+'-'+idx); x+=44;
+      chip(sv,x,y+40,40,44,'LIF',null,COLORS.lif,'fd-l'+u+'-'+idx); x+=52;
+    }
+    if(src!==tgt){
+      chip(sv,x,y+40,86,44,'Conv 1×1',src+'→'+tgt,COLORS.conv,'fd-pw-'+idx); x+=94;
+      chip(sv,x,y+40,40,44,'LIF',null,COLORS.lif,'fd-pl-'+idx); x+=48;
+    }
+    chip(sv,x,y+40,86,44,'Output',tgt+'ch @ s='+M.strides[t],COLORS.stem,'fd-out-'+idx);
+    // arrows between
+    let prevEnd=136;
+    const connCount = nUp*3 + (src!==tgt?2:0) + 1;
+    // redraw arrows simply across full chain
+    (function drawArrows(){
+      let cx=136;
+      for(let u=0;u<nUp;u++){
+        arrow(sv,[[cx,cy],[cx+8,cy]],{}); cx+=128;
+        arrow(sv,[[cx,cy],[cx+8,cy]],{}); cx+=44;
+        arrow(sv,[[cx,cy],[cx+8,cy]],{}); cx+=52;
+      }
+      if(src!==tgt){ arrow(sv,[[cx,cy],[cx+8,cy]],{}); cx+=94; arrow(sv,[[cx,cy],[cx+8,cy]],{}); cx+=48; }
+      arrow(sv,[[cx,cy],[cx+8,cy]],{});
+    })();
+    const note = `scale_factor=${d} ${d>1&&((d&(d-1))===0)?'(power of 2 ✓)':'(NOT power of 2 ✗)'} • channels ${src===tgt?'match → no 1×1 needed':'differ → 1×1 conv + LIF appended'}`;
+    txt(sv,525,y+100,note,{size:10.5,fill:'#3a6b3a',weight:600});
+    sv.setAttribute('height',h+30);
+    wrap.appendChild(div);
+  });
+}
+
+/* ================= Detail C: ConvRecurrentContainer zoom ================= */
+const svgRec=mkSVG('svgRec');
+function renderRecDetail(M){
+  svgRec.innerHTML=''; addDefs(svgRec);
+  const i=1; // example: stage L2
+  const inC=M.inCh[i], outC=M.sc[i], extC=M.extTotal[i], totC=M.totCh[i];
+  const sh=M.spat[i], sw=M.spatW[i];
+  const y=20, H=190;
+  svgRec._el('rect',{x:40,y,width:970,height:H,rx:12,fill:'#fdfbff',stroke:'#7b3fa0','stroke-width':1.6});
+  txt(svgRec,525,y+20,`ConvRecurrentContainer — example: L${i+1} (in=${inC}, out=${outC}, stride=${M.strides[i]}, external_fb=${extC}ch)` ,{size:13,weight:800,fill:'#4a2470'});
+
+  const r1=y+38, r2=y+96;
+  // inputs
+  chip(svgRec,56,r1,150,40,'x(t)','['+inC+'ch, '+sh+'×'+sw+']',COLORS.stem,'rc-x');
+  chip(svgRec,56,r2,170,40,'y(t−1) × '+S.recScale,'['+outC+'ch] (state)',COLORS.rec,'rc-y');
+  if(extC>0){
+    chip(svgRec,56,r2+48,170,32,'external_fb (t−1)','['+extC+'ch]',COLORS.rec,'rc-fb');
+  } else {
+    label(svgRec,141,r2+60,'(no external feedback → zeros / absent)','#8a8fa3',10);
+  }
+  // recurrent preprocessing
+  chip(svgRec,246,r2,190,40,'DWConvT 3×3 s'+M.strides[i]+' → BN → LIF','depthwise upsample',COLORS.conv,'rc-pre');
+  arrow(svgRec,[[226,r2+20],[242,r2+20]],{color:'#7b3fa0',marker:'arrp',dash:'4,4'});
+  // interp note
+  label(svgRec,341,r2+58,'if size ≠ (H,W): interpolate nearest','#7b3fa0',9.5);
+  // concat
+  const ccx=520, ccy=y+56;
+  chip(svgRec,ccx-30,ccy,60,64,'Cat','dim=1',COLORS.cat,'rc-cat');
+  arrow(svgRec,[[206,r1+20],[ccx-34,ccy+14]],{});
+  arrow(svgRec,[[436,r2+20],[ccx-34,ccy+36]],{color:'#7b3fa0'});
+  if(extC>0) arrow(svgRec,[[226,r2+64],[ccx-34,ccy+54]],{color:'#7b3fa0'});
+  label(svgRec,ccx,ccy+80,`total = ${inC}+${outC}${extC>0?'+'+extC:''} = ${totC}ch`,'#8a5a00',10);
+  // main chain
+  chip(svgRec,566,ccy,120,64,'PWConv 1×1',totC+' → '+inC,COLORS.conv,'rc-pw');
+  chip(svgRec,694,ccy,38,64,'BN',null,COLORS.bn,'rc-bn');
+  chip(svgRec,740,ccy,38,64,'LIF',null,COLORS.lif,'rc-lif');
+  chip(svgRec,786,ccy,110,64,S.layers[i]+'×'+M.BlockName,inC+'→'+outC,COLORS.sub,'rc-sub');
+  [[686,694],[732,740],[778,786]].forEach(([a,b])=>arrow(svgRec,[[a,ccy+32],[b,ccy+32]],{}));
+  arrow(svgRec,[[896,ccy+32],[930,ccy+32]],{});
+  label(svgRec,930,ccy+26,'y(t)','#2e7d32',11);
+  label(svgRec,930,ccy+42,'['+outC+'ch]','#2e7d32',9.5);
+  // store back
+  arrow(svgRec,[[985,ccy+32],[1000,ccy+32]],{color:'#2e7d32'});
+  svgRec.setAttribute('height',y+H+40);
+  txt(svgRec,525,y+H+26,'State y is stored (register_memory) and consumed at the NEXT time step → recurrence + one-step-delayed feedback.',{size:11,fill:'#4a2470',weight:700});
+}
+
+/* ================= Console simulation ================= */
+function renderConsole(M){
+  const L=[];
+  const f=s=>L.push(s);
+  f(`# input x: torch.Size([${S.T}, ${S.B}, 3, ${S.H}, ${S.W}])`);
+  for(let t=0;t<S.T;t++){
+    for(let i=0;i<4;i++){
+      f(`fusion_inputs[0] | shape=[${S.B}, ${M.inCh[i]}, ${M.spat[i]}, ${M.spatW[i]}]   (x)`);
+      f(`fusion_inputs[1] | shape=[${S.B}, ${M.sc[i]}, ${M.spat[i]}, ${M.spatW[i]}]   (recurrent ×${S.recScale})`);
+      if(M.extTotal[i]>0)
+        f(`fusion_inputs[2] | shape=[${S.B}, ${M.extTotal[i]}, ${M.spat[i]}, ${M.spatW[i]}]   (external fb)`);
+    }
+    for(let i=0;i<4;i++){
+      const fb=(t>0 && M.extTotal[i]>0)?`[${S.B}, ${M.extTotal[i]}, ${M.spat[i]}, ${M.spatW[i]}]`:'None';
+      f(`t = ${t}  L${i+1} feedback = ${fb}`);
+    }
+    f('---');
+  }
+  document.getElementById('console').textContent=L.join('\n');
+}
+
+/* ================= Step-through animation ================= */
+let playing=false, cancelAnim=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function play(){
+  readControls();
+  if(playing){ cancelAnim=true; return; }
+  playing=true; cancelAnim=false;
+  const btn=document.getElementById('btnPlay'); btn.textContent='⏹ Stop';
+  const badge=document.getElementById('badge'); badge.style.display='inline-block';
+  document.querySelectorAll('.pulse').forEach(e=>e.classList.remove('pulse'));
+  fbArrowIds.forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('dim'); });
+
+  for(let t=0;t<S.T;t++){
+    if(cancelAnim) break;
+    badge.textContent=`time step  t = ${t}`;
+    fbArrowIds.forEach((id,k)=>{
+      const e=document.getElementById(id); if(!e) return;
+      if(t>0 && fbArrowActive[k]) e.classList.remove('dim');
+    });
+    const seq=[['st-c','st-b','st-l','st-m']];
+    for(let i=0;i<4;i++)
+      seq.push([`cat-${i}`,`pw-${i}`,`bn-${i}`,`lif-${i}`,`sub-${i}`,`rec-${i}`,`out-${i}`]);
+    seq.push(['h-avg','h-flat','h-fc','h-out']);
+    for(const grp of seq){
+      if(cancelAnim) break;
+      grp.forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('pulse'); });
+      await sleep(300);
+      grp.forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.remove('pulse'); });
+    }
+  }
+  badge.style.display='none';
+  document.querySelectorAll('.dim').forEach(e=>e.classList.remove('dim'));
+  playing=false; btn.textContent='▶️ Step-through simulation (time loop)';
+}
+
+/* ================= Render everything ================= */
+function renderAll(){
+  readControls();
+  const M=computeModel();
+  renderMain(M);
+  renderBlockDetail(M);
+  renderFeedbackDetails(M);
+  renderRecDetail(M);
+  renderConsole(M);
+}
+document.getElementById('btnRender').onclick=renderAll;
+document.getElementById('btnPlay').onclick=play;
+document.getElementById('feedbackRange').oninput=e=>{document.getElementById('frVal').textContent=e.target.value;};
+renderAll();
+</script>
+</body>
+</html>
